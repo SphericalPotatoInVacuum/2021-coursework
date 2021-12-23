@@ -107,12 +107,42 @@ style: |
 ---
 <!-- header: "" -->
 
+# DeepFace
+
+---
+<!-- header: DeepFace -->
+
+![center](deepface-alignment.png)
+
+---
+
+![center](deepface-architecture.png)
+
+---
+
+## Как сравнивать выходы?
+
+Используем $\chi^2$-similarity:
+
+$\chi^2(f_1, f_2) = \sum_i w_i(f_1[i] - f_2[i])^2/(f_1[i] + f_2[i])$
+
+Веса достаём, обучая линейный SVM на векторах $(f_1[i] - f_2[i])^2/(f_1[i] + f_2[i])$
+
+---
+<!-- header: "" -->
+
 # FaceNet
 
 ---
 <!-- header: FaceNet -->
 
 ![center](facenet-architecture.png)
+
+---
+
+## Triplet loss
+
+![center](triplet-loss.png)
 
 ---
 
@@ -123,3 +153,28 @@ $\|f(x_i^a) - f(x_i^p)\|_2^2 + \alpha < \|f(x_i^a) - f(x_i^n)\|_2^2$
 А значит:
 
 $L = \sum_i^N \|f(x_i^a) - f(x_i^n)\|_2^2 - \|f(x_i^a) - f(x_i^p)\|_2^2 - \alpha$
+
+---
+
+## Как выбирать триплеты?
+
+Хотим $x_i^p = \argmax_{x_i^p} \|f(x_i^a) - f(x_i^p)\|_2^2$
+и $x_i^n = \argmax_{x_i^n} \|f(x_i^a) - f(x_i^n)\|_2^2$
+
+Искать такое дело по всей выборке сложно и вообще говоря плохо, поэтому будем аргмаксить по минибатчам.
+
+---
+<!-- header: "" -->
+
+# Deep Face Recognition
+
+---
+<!-- header: FaceNet -->
+
+![center](deep-face-architecture.png)
+
+---
+
+## Как обучать?
+
+Идея: давайте сначала обучим классификатор на N классов с обычным логлоссом, а потом отрежем ему голову и дофайнтюним триплет лоссом.

@@ -79,9 +79,15 @@ def train(config: Config):
     image_datasets['val'] = datasets.ImageFolder(data_dir / 'val',
                                                  data_transforms['val'])
 
-    dataloaders = {x: torch.utils.data.DataLoader(image_datasets[x], batch_size=config.batch_size,
-                                                  shuffle=True, num_workers=8, pin_memory=True)
-                   for x in ['train', 'val']}
+    dataloaders = {
+        x: torch.utils.data.DataLoader(
+            image_datasets[x],
+            batch_size=config.batch_size,
+            shuffle=True,
+            num_workers=8,
+            pin_memory=True) for x in [
+            'train',
+            'val']}
 
     dataset_sizes = {x: len(image_datasets[x]) for x in ['train', 'val']}
 
@@ -113,7 +119,8 @@ def train(config: Config):
 
     def fliplr(img):
         '''flip horizontal'''
-        inv_idx = torch.arange(img.size(3) - 1, -1, -1).long().cuda()  # N x C x H x W
+        inv_idx = torch.arange(
+            img.size(3) - 1, -1, -1).long().cuda()  # N x C x H x W
         img_flip = img.index_select(3, inv_idx)
         return img_flip
 
@@ -182,11 +189,13 @@ def train(config: Config):
                     loss = criterion(logits, labels)
                     _, preds = torch.max(logits.data, 1)
                     hard_pairs = miner(ff, labels)
-                    loss += criterion_triplet(ff, labels, hard_pairs)  # /now_batch_size
+                    # /now_batch_size
+                    loss += criterion_triplet(ff, labels, hard_pairs)
                     # loss += criterion_sphere(ff, labels) / now_batch_size
 
                     del inputs
-                    # use extra DG Dataset (https://github.com/NVlabs/DG-Net#dg-market)
+                    # use extra DG Dataset
+                    # (https://github.com/NVlabs/DG-Net#dg-market)
 
                     # backward + optimize only if in training phase
                     if epoch < config.warm_epoch and phase == 'train':
@@ -197,7 +206,9 @@ def train(config: Config):
                         loss.backward()
                         optimizer.step()
                     # statistics
-                    if int(version[0]) > 0 or int(version[2]) > 3:  # for the new version like 0.4.0, 0.5.0 and 1.0.0
+                    if int(
+                            version[0]) > 0 or int(
+                            version[2]) > 3:  # for the new version like 0.4.0, 0.5.0 and 1.0.0
                         running_loss += loss.item() * now_batch_size
                     else:  # for the old version like 0.3.0 and 0.3.1
                         running_loss += loss.data[0] * now_batch_size
@@ -207,7 +218,8 @@ def train(config: Config):
                 epoch_loss = running_loss / dataset_sizes[phase]
                 epoch_acc = running_corrects / dataset_sizes[phase]
 
-                logger.info(f'{phase} Loss: {epoch_loss:.4f} Acc: {epoch_acc:.4f}')
+                logger.info(
+                    f'{phase} Loss: {epoch_loss:.4f} Acc: {epoch_acc:.4f}')
 
                 y_loss[phase].append(epoch_loss)
                 y_err[phase].append(1.0 - epoch_acc)
@@ -220,10 +232,12 @@ def train(config: Config):
                 if phase == 'train':
                     scheduler.step()
             time_elapsed = time.time() - since
-            logger.info(f'Training complete in {time_elapsed // 60:.0f}:{time_elapsed % 60:2.0f}')
+            logger.info(
+                f'Training complete in {time_elapsed // 60:.0f}:{time_elapsed % 60:2.0f}')
 
         time_elapsed = time.time() - since
-        logger.info(f'Training complete in {time_elapsed // 60:.0f}:{time_elapsed % 60:2.0f}')
+        logger.info(
+            f'Training complete in {time_elapsed // 60:.0f}:{time_elapsed % 60:2.0f}')
         # print('Best val Acc: {:4f}'.format(best_acc))
 
         # load best model weights
@@ -276,7 +290,9 @@ def train(config: Config):
     optim_name = optim.SGD
 
     ignored_params = list(map(id, model.classifier.parameters()))
-    base_params = filter(lambda p: id(p) not in ignored_params, model.parameters())
+    base_params = filter(
+        lambda p: id(p) not in ignored_params,
+        model.parameters())
     classifier_params = model.classifier.parameters()
     optimizer_ft = optim_name([
         {'params': base_params, 'lr': 0.1 * config.lr},
@@ -284,7 +300,8 @@ def train(config: Config):
     ], weight_decay=5e-4, momentum=0.9, nesterov=True)
 
     # Decay LR by a factor of 0.1 every 40 epochs
-    exp_lr_scheduler = lr_scheduler.StepLR(optimizer_ft, step_size=config.total_epoch * 2 // 3, gamma=0.1)
+    exp_lr_scheduler = lr_scheduler.StepLR(
+        optimizer_ft, step_size=config.total_epoch * 2 // 3, gamma=0.1)
 
     ######################################################################
     # Train and evaluate
@@ -293,10 +310,10 @@ def train(config: Config):
     # It should take around 1-2 hours on GPU.
     #
     dir_name = Path('models') / name
-    dir_name.mkdir(exist_ok=True)
+    dir_name.mkdir(exist_ok=True, parents=True)
 
     # save opts
-    (dir_name / 'opts.toml').write_text(rtoml.dumps(config.dict(), pretty=True))
+    # (dir_name / 'opts.toml').write_text(rtoml.dumps(config.dict(), pretty=True))
 
     criterion = nn.CrossEntropyLoss()
 

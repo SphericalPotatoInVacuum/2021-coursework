@@ -1,0 +1,7 @@
+# training config
+batch_size = 10
+point_batches = 500
+lr = 0.001
+lr_decay = 0.2
+data_path = "data/raw/Coco"
+total_epoch = 20

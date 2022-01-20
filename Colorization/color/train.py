@@ -1,11 +1,9 @@
-from __future__ import division, print_function
-
 import time
+import datetime
 from pathlib import Path
 
 import torch
 from loguru import logger
-from torch.utils.tensorboard import SummaryWriter
 from torchvision import models
 from torch.utils.data import Dataset
 
@@ -21,7 +19,7 @@ class CustomDataset(Dataset):
     def __init__(self, root_dir: Path):
         self.root_dir = root_dir
         self.files = list(root_dir.iterdir())
-        self.files = self.files[:int(len(self.files) + 1)]
+        self.files = self.files[:len(self.files) // 10 + 1]
         logger.info(f'File[0]: {self.files[0]}, Total Files: {len(self.files)}')
 
     def __len__(self):
@@ -86,10 +84,10 @@ class CustomDataset(Dataset):
             logger.error(f'Exception at {self.files[index]}, {e}')
             return torch.tensor(-1), torch.tensor(-1), torch.tensor(-1), torch.tensor(-1), 'Error'
 
-# ##### Convert Tensor Image -> Numpy Image -> Color  Image -> Tensor Image
 
-
+# Convert Tensor Image -> Numpy Image -> Color  Image -> Tensor Image
 def concatente_and_colorize(im_lab, img_ab):
+    logger.info(f'{im_lab.shape}, {img_ab.shape}')
     # Assumption is that im_lab is of size [1,3,224,224]
     # print(im_lab.size(),img_ab.size())
     np_img = im_lab[0].cpu().detach().numpy().transpose(1, 2, 0)
@@ -102,13 +100,17 @@ def concatente_and_colorize(im_lab, img_ab):
 
 
 def train(config: Config):
+    if config.wb_enabled:
+        import wandb
+
+        wandb.init(project=config.project_name, entity=config.entity)
+
     resnet_model = models.resnet50(pretrained=True, progress=True).float().cuda()
     resnet_model.eval()
     resnet_model = resnet_model.float()
 
     loss_criterion = torch.nn.MSELoss(reduction='mean').cuda()
     milestone_list = list(range(0, config.total_epoch, 5))
-    writer = SummaryWriter()
     model = Colorization(256).cuda()
     optimizer = torch.optim.Adam(model.parameters(), lr=config.lr, weight_decay=1e-6)
     scheduler = torch.optim.lr_scheduler.MultiStepLR(
@@ -134,8 +136,17 @@ def train(config: Config):
         num_workers=8
     )
 
-    logger.info(f'Train: {len(train_dataloader)} Total Images: {len(train_dataloader) * config.batch_size}')
-    logger.info(f'Valid: {len(validation_dataloader)} Total Images: {len(validation_dataloader) * config.batch_size}')
+    model_save_path = Path('models') / datetime.datetime.utcnow().strftime('%Y-%m-%d %H-%M-%S')
+    model_save_path.mkdir()
+
+    logger.info(
+        f'Train: {len(train_dataloader)}, '
+        f'Total Images: {len(train_dataloader) * config.batch_size}'
+    )
+    logger.info(
+        f'Valid: {len(validation_dataloader)}, '
+        f'Total Images: {len(validation_dataloader) * config.batch_size}'
+    )
 
     for epoch in range(config.total_epoch):
         logger.info(f'Starting epoch #{epoch + 1}')
@@ -182,16 +193,18 @@ def train(config: Config):
             batch_loss += loss.item()
 
             # *** Print stats after every point_batches ***
-            if idx + 1 % config.point_batches == 0:
+            if (idx + 1) % config.point_batches == 0:
                 loop_end = time.time()
                 logger.info(
-                    f'Batch: {idx}, Batch time: {loop_end - loop_start: 3.1f}s, Batch Loss: {batch_loss / config.point_batches:7.5f}')
+                    f'Batch: {idx + 1}, '
+                    f'Batch time: {loop_end - loop_start: 3.1f}s, '
+                    f'Batch Loss: {batch_loss / config.point_batches:7.5f}'
+                )
                 loop_start = time.time()
                 batch_loss = 0.0
 
         # *** Print Training Data Stats ***
         train_loss = avg_loss / len(train_dataloader) * config.batch_size
-        writer.add_scalar('Loss/train', train_loss, epoch)
         logger.info(f'Training Loss: {train_loss}, Processed in {time.time() - main_start:.3f}s')
 
         # *** Validation Step ***
@@ -218,21 +231,22 @@ def train(config: Config):
             avg_loss += loss.item()
 
         val_loss = avg_loss / len(validation_dataloader) * config.batch_size
-        writer.add_scalar('Loss/validation', val_loss, epoch)
-        logger.info(f'Validation Loss: {val_loss} Processed in {time.time() - loop_start:.3f}s')
+        logger.info(f'Validation Loss: {val_loss}, Processed in {time.time() - loop_start:.3f}s')
 
         logger.success(
-            f'Finished epoch #{epoch + 1} out of {config.total_epoch}. Train loss: {train_loss:.5f}, val loss: {val_loss:.5f}')
+            f'Finished epoch #{epoch + 1} out of {config.total_epoch}. '
+            f'Train loss: {train_loss:.5f}, val loss: {val_loss:.5f}'
+        )
+        if config.wb_enabled:
+            wandb.log({"Validation loss": val_loss, "Train loss": loss}, step=epoch)
 
         # *** Save the Model to disk ***
         checkpoint = {'model_state_dict': model.state_dict(),
                       'optimizer_state_dict': optimizer.state_dict(),
                       'scheduler_state_dict': scheduler.state_dict(),
                       'train_loss': train_loss, 'val_loss': val_loss}
-        save_path = Path('models')
-        save_path.mkdir(exist_ok=True)
-        torch.save(checkpoint, save_path / str(epoch + 1))
-        logger.info(f'Model saved at: {save_path / str(epoch + 1)}')
+        torch.save(checkpoint, model_save_path / str(epoch + 1))
+        logger.info(f'Model saved at: {model_save_path / str(epoch + 1)}')
 
     # ### Inference
 
@@ -272,21 +286,24 @@ def train(config: Config):
         save_image(color_img[0], save_path)
 
         # *** Printing to Tensor Board ***
-        grid = torchvision.utils.make_grid(color_img)
-        writer.add_image('Output Lab Images', grid, 0)
+        # grid = torchvision.utils.make_grid(color_img)
+        # writer.add_image('Output Lab Images', grid, 0)
 
         # *** Loss Calculation ***
         loss = loss_criterion(output_ab, img_ab_encoder.float())
         avg_loss += loss.item()
         batch_loss += loss.item()
 
-        if idx + 1 % config.point_batches == 0:
+        if (idx + 1) % config.point_batches == 0:
             batch_end = time.time()
             logger.info(
-                f'Batch: {idx + 1}, Processing time for {config.point_batches}: {batch_end - batch_start:.3f}s, Batch Loss: {batch_loss / config.point_batches}')
+                f'Batch: {idx + 1}, '
+                f'Processing time for {config.point_batches}: {batch_end - batch_start:.3f}s, '
+                f'Batch Loss: {batch_loss / config.point_batches}'
+            )
             batch_start = time.time()
             batch_loss = 0.0
 
     test_loss = avg_loss / len(test_dataloader)
     logger.info(f'Test Loss: {test_loss} Processed in {time.time() - loop_start:.3f}s')
-    writer.close()
+    # writer.close()

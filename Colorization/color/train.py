@@ -19,7 +19,6 @@ class CustomDataset(Dataset):
     def __init__(self, root_dir: Path):
         self.root_dir = root_dir
         self.files = list(root_dir.iterdir())
-        self.files = self.files[:len(self.files) // 10 + 1]
         logger.info(f'File[0]: {self.files[0]}, Total Files: {len(self.files)}')
 
     def __len__(self):
@@ -118,7 +117,6 @@ def train(config: Config):
         milestones=milestone_list,
         gamma=config.lr_decay
     )
-    flag = True
 
     train_dataset = CustomDataset(config.data_path / 'train')
     train_dataloader = torch.utils.data.DataLoader(
@@ -175,9 +173,6 @@ def train(config: Config):
             img_embs = resnet_model(img_l_resnet.float())
             output_ab = model(img_l_encoder, img_embs)
 
-            if flag:
-                print(img_embs.size())
-                flag = False
             # *** Back propogation ***
             loss = loss_criterion(output_ab, img_ab_encoder.float())
             loss.backward()
@@ -238,7 +233,7 @@ def train(config: Config):
             f'Train loss: {train_loss:.5f}, val loss: {val_loss:.5f}'
         )
         if config.wb_enabled:
-            wandb.log({"Validation loss": val_loss, "Train loss": loss}, step=epoch)
+            wandb.log({"Validation loss": val_loss, "Train loss": train_loss}, step=epoch)
 
         # *** Save the Model to disk ***
         checkpoint = {'model_state_dict': model.state_dict(),

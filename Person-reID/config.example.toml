@@ -1,0 +1,11 @@
+batch_size = 64
+chat_id = <your_chat_id>
+color_jitter = true
+data_path = "data/raw/Market-1501"
+lr = 0.05
+model_name = "ResNet"
+multi = false
+scale = [1]
+token = <your_telegram_bot_token>
+total_epoch = 15
+warm_epoch = 2

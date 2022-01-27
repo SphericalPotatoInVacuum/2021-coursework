@@ -1,0 +1,7 @@
+venv
+data
+models
+outputs
+runs
+wandb
+pics

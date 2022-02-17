@@ -1,0 +1,6 @@
+[submodule "FontClassifier/data/Latin/fonts/Datagen"]
+	path = FontClassifier/data/Latin/fonts/Datagen
+	url = git@github.com:youdao-ai/SRNet-Datagen.git
+[submodule "FontClassifier/Datagen"]
+	path = FontClassifier/Datagen
+	url = git@github.com:youdao-ai/SRNet-Datagen.git

@@ -8,5 +8,5 @@ total_epoch = 20
 
 # wb config
 wb_enabled = true
-project_name = 'your_project_name'
-entity = 'your_username'
+project_name = 'Colorization'
+entity = 'sphericalpotatoinvacuum'

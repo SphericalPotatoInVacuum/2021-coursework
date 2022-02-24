@@ -53,10 +53,10 @@ def train():
         T.Resize((224, 224)),
         T.Normalize([0.4803, 0.4481, 0.3976], [0.2769, 0.2690, 0.2820]),
     ])
-    train_dataset = ImageFolder('data/Font_train_tiny', transform=transform)
-    train_dataloader = DataLoader(train_dataset, batch_size=32, num_workers=15, shuffle=True)
+    train_dataset = ImageFolder('data/Typefaces', transform=transform)
+    train_dataloader = DataLoader(train_dataset, batch_size=16, num_workers=15, shuffle=True)
 
-    val_dataset = ImageFolder('data/Font_val_tiny', transform=transform)
+    val_dataset = ImageFolder('data/Typefaces', transform=transform)
     val_dataloader = DataLoader(val_dataset, batch_size=1, num_workers=15, shuffle=True)
 
     model = vgg19(pretrained=True).cuda()
@@ -70,7 +70,6 @@ def train():
     n_epochs = 5
 
     model.to(device)
-    losses, predicted_classes, true_classes = predict(model, val_dataloader, criterion, device)
     for epoch in range(n_epochs):
         train_one_epoch(model, train_dataloader, criterion, optimizer, device)
         losses, predicted_classes, true_classes = predict(model, val_dataloader, criterion, device)
